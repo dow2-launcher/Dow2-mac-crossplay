@@ -3,6 +3,8 @@
 Each version adds one or more dylib parts (`src/*fix.c`); every part can be switched off with `DOW2_NO<NAME>=1`.
 Versions v8-v25 were developed in [Dow2-patches](https://github.com/dow2-launcher/Dow2-patches) (`mac/`); this repo starts at v26.
 
+- **v27** (13.11.2026) - first public release, vanilla only. Same fixes as v26; the release build no longer has the
+  diagnostics (`rngtrace`, `crctrace`, the libcurl request log). Elite run script, tests and dev tools removed from the repo.
 - **v26** (10.11.2026) - `scatfix` (part 32): WeaponUtil::GetEntitiesInScatterArea angle test summed `(z+y)+x` as DOW2.exe
   (burst target groups). 1M cases 211527 -> 0. **All 56 vanilla reference replays match Windows to the end (Low).**
 - **v25** (09-10.11) - `rowfix` (part 31): RightOfWay CollectLowerPriorityEntitiesOnLine direction as `1/len*dx` (Windows) instead of `dx/len`.

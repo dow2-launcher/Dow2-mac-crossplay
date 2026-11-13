@@ -1,13 +1,13 @@
 name: build
-# Builds crossplay_fix.dylib and the player zip from src/ (src/build_ci.sh) on a macOS runner with clang 19.
-# Every push / PR: workflow artifact. Push to main: build provenance attestation + pre-release "mac-crossplay-<ver>"
+# Builds crossplay_fix.dylib and the player zip from src/ (src/build.sh) on a macOS runner with clang 19.
+# Every push / PR: workflow artifact. Push to main: build provenance attestation + release "mac-crossplay-<ver>" (src/VERSION)
 # in this repository (assets replaced on rebuild). Nothing is uploaded anywhere else; no secrets are used.
 on:
   push:
     branches: [main]
-    paths: ["src/**", ".github/workflows/build.yml"]
+    paths: ["src/**", "README.md", "LICENSE", ".github/workflows/build.yml"]
   pull_request:
-    paths: ["src/**", ".github/workflows/build.yml"]
+    paths: ["src/**", "README.md", "LICENSE", ".github/workflows/build.yml"]
   workflow_dispatch:
 
 permissions:
@@ -33,10 +33,14 @@ jobs:
       - name: Build
         env:
           CC: /opt/homebrew/opt/llvm@19/bin/clang
-        run: src/build_ci.sh
+        run: src/build.sh
       - name: Check
         run: |
           d=src/out/crossplay_fix.dylib
+          if nm "$d" | grep -Ei "rngtrace|crctrace|rng_stub"; then echo "diagnostics in the release build"; exit 1; fi
+          if strings "$d" | grep -Ei "elite|dow2_net|dow2_rng|dow2_crc"; then echo "Elite or diagnostics strings in the dylib"; exit 1; fi
+          if unzip -Z1 src/out/*.zip | grep -Eiv '^dow2mac/(crossplay_fix\.dylib|run_vanilla\.command|README\.txt|LICENSE\.txt)?$'; then echo "unexpected files in the zip"; exit 1; fi
+          if grep -Ei "elite|curl|wget|https?://" src/out/dow2mac/run_vanilla.command; then echo "Elite or download logic in the run script"; exit 1; fi
           file "$d"; otool -l "$d" | grep -A3 LC_BUILD_VERSION -m1 || otool -l "$d" | grep -A3 LC_VERSION_MIN -m1
           nm -gU "$d" | head -5
           unzip -l src/out/*.zip
@@ -78,9 +82,10 @@ jobs:
           TAG="mac-crossplay-$VER"
           ls -la dist
           if gh release view "$TAG" >/dev/null 2>&1; then
-            gh release upload "$TAG" dist/*.zip dist/crossplay_fix.dylib dist/SHA256SUMS.txt --clobber
+            gh release upload "$TAG" dist/*.zip --clobber
           else
-            gh release create "$TAG" dist/*.zip dist/crossplay_fix.dylib dist/SHA256SUMS.txt --target "$GITHUB_SHA" --prerelease \
-              --title "Mac crossplay $VER (test build)" \
-              --notes "DoW2 Retribution: native Mac (Feral) <-> Windows crossplay patch, $VER. Test build. Built from src/ by this workflow; verify with: gh attestation verify <file> -R $GH_REPO. Install: README_RU.txt in the zip."
+            SUM=$(grep '\.zip$' dist/SHA256SUMS.txt | cut -d' ' -f1)
+            gh release create "$TAG" dist/*.zip --target "$GITHUB_SHA" \
+              --title "Mac crossplay $VER (vanilla)" \
+              --notes "Dawn of War II: Retribution - the native Mac (Feral, Steam) version plays multiplayer with Windows players. Vanilla only (Elite is not supported yet), no launcher needed. Unzip, run run_vanilla.command; uninstall = delete the folder. Built from src/ at $GITHUB_SHA by this workflow. SHA-256 of the zip: $SUM. Verify: gh attestation verify <zip> -R $GH_REPO"
           fi
